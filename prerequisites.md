@@ -30,7 +30,7 @@ Berikut adalah langkah-langkah untuk menginstall Apache Cassandra di Rocky Linux
    sudo firewall-cmd --add-port=9160/tcp --permanent
    sudo firewall-cmd --reload
    ```
-
+   
 ---
 
 ## **Langkah Instalasi**
@@ -46,6 +46,7 @@ Berikut adalah langkah-langkah untuk menginstall Apache Cassandra di Rocky Linux
     gpgkey=https://downloads.apache.org/cassandra/KEYS
     EOF
    ```
+   ![cassandra repo](images/cassandra-repo.png)
 
 ### 2. **Instal Apache Cassandra**
    Setelah repository ditambahkan, instal Cassandra:
@@ -56,8 +57,13 @@ Berikut adalah langkah-langkah untuk menginstall Apache Cassandra di Rocky Linux
 ### 3. **Konfigurasi Cassandra**
    File konfigurasi utama Cassandra ada di `/etc/cassandra/default.conf/cassandra.yaml`. Anda dapat mengedit parameter seperti:
    - **cluster_name**: Nama kluster Cassandra.
+   ![cluster name](images/cluster-name.png)
+
    - **listen_address**: IP server.
+   ![listen address](images/listen-address.png)
+
    - **rpc_address**: IP untuk komunikasi dengan klien.
+   ![rpc address](images/rpc-address.png)
 
    Contoh pengeditan:
    ```bash
@@ -75,11 +81,6 @@ Berikut adalah langkah-langkah untuk menginstall Apache Cassandra di Rocky Linux
    Untuk memeriksa apakah Cassandra berjalan:
    ```bash
    nodetool status
-   ```
-
-   Untuk masuk ke shell CQL (Cassandra Query Language):
-   ```bash
-   cqlsh
    ```
 
 ---
@@ -110,6 +111,7 @@ Jika file unit systemd Cassandra tidak ada, Anda bisa membuatnya secara manual. 
     [Install]
     WantedBy=multi-user.target
    ```
+   ![cassandra service](images/cassandra-service.png)
 
 3. **Reload Systemd dan Mulai Layanan:**
    Setelah file unit Cassandra dibuat, reload systemd dan mulai layanan Cassandra:
@@ -167,10 +169,105 @@ Jika perintah `sudo dnf install python3-cqlsh` gagal karena paket `python3-cqlsh
    ```bash
    cassandra -v
    ```
+   ![cassandra version](images/cassandra-version.png)
 
 ---
 
+Untuk membuat pengguna database, menetapkan kata sandi, dan membuat nama database di Cassandra menggunakan `cqlsh`, Anda bisa mengikuti langkah-langkah berikut:
 
+---
+
+### 1. **Masuk ke `cqlsh`**
+   Jalankan perintah berikut untuk masuk ke antarmuka Cassandra Query Language Shell (CQLSH):
+   ```bash
+   cqlsh
+   ```
+
+---
+
+### 2. **Aktifkan Otentikasi**
+   Jika otentikasi tidak diaktifkan, Anda perlu mengaktifkannya di file konfigurasi Cassandra (`cassandra.yaml`). Cari parameter `authenticator` dan ubah nilainya menjadi `PasswordAuthenticator`:
+
+   ```yaml
+   authenticator: PasswordAuthenticator
+   ```
+   ![cassandra authenticator](images/cassandra-authenticator.png)
+
+   Setelah itu, restart Cassandra:
+   ```bash
+   sudo systemctl restart cassandra
+   ```
+
+---
+
+### 3. **Login sebagai Superuser**
+   Masuk ke `cqlsh` dengan kredensial default superuser (`cassandra` adalah username dan password default):
+   ```bash
+   cqlsh -u cassandra -p cassandra
+   ```
+
+---
+
+### 4. **Buat Pengguna Baru**
+   Gunakan perintah `CREATE USER` untuk membuat pengguna baru dengan nama pengguna, kata sandi, dan tingkat izin tertentu. Contohnya:
+   ```sql
+   CREATE USER new_user WITH PASSWORD 'new_password' NOSUPERUSER;
+   ```
+
+   **Penjelasan:**
+   - `new_user`: Nama pengguna yang ingin Anda buat.
+   - `new_password`: Kata sandi untuk pengguna tersebut.
+   - `NOSUPERUSER`: Membuat pengguna tanpa hak superuser. Jika ingin memberikan hak superuser, gunakan `SUPERUSER`.
+
+---
+
+### 5. **Buat Nama Database (Keyspace)**
+   Gunakan perintah `CREATE KEYSPACE` untuk membuat keyspace (nama database):
+   ```sql
+   CREATE KEYSPACE new_keyspace
+   WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+   ```
+
+   **Penjelasan:**
+   - `new_keyspace`: Nama database yang ingin Anda buat.
+   - `SimpleStrategy`: Strategi replikasi. Cocok untuk pengujian lokal atau cluster kecil.
+   - `replication_factor`: Jumlah replika data yang disimpan.
+
+---
+
+### 6. **Beri Izin pada Pengguna**
+   Gunakan perintah `GRANT` untuk memberikan izin pengguna pada keyspace tertentu:
+   ```sql
+   GRANT ALL PERMISSIONS ON KEYSPACE new_keyspace TO new_user;
+   ```
+
+   **Penjelasan:**
+   - `ALL PERMISSIONS`: Memberikan semua izin (Anda juga bisa spesifik seperti `SELECT`, `MODIFY`, `CREATE`, dll.).
+   - `new_keyspace`: Nama keyspace (database).
+   - `new_user`: Nama pengguna.
+
+---
+
+### Contoh Lengkap:
+Berikut adalah skrip contoh untuk membuat pengguna, keyspace, dan memberikan izin:
+
+```sql
+CREATE USER myuser WITH PASSWORD 'mypassword' NOSUPERUSER;
+
+CREATE KEYSPACE mydatabase
+WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+
+GRANT ALL PERMISSIONS ON KEYSPACE mydatabase TO myuser;
+```
+
+---
+
+Setelah selesai, pengguna `myuser` sekarang dapat digunakan untuk mengakses keyspace `mydatabase` dengan kata sandi `mypassword`. Anda bisa login dengan:
+```bash
+cqlsh -u myuser -p mypassword
+```
+
+---
 
 ## **Tips dan Troubleshooting**
 1. **Java Version Mismatch**: Pastikan JDK versi 8 atau 11 yang digunakan. Gunakan `java -version` untuk memverifikasi.
